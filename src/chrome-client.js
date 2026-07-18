@@ -60,7 +60,9 @@ const whiteboardError = /** @type {HTMLDivElement} */ (document.getElementById("
 const artifactSrc = frame.dataset.artifactSrc || frame.getAttribute?.("data-artifact-src") || frame.src || "";
 
 const queued = loadQueuedPrompts();
-let annotation = true;
+// Bleau Labs fork: the Annotate switch starts OFF - clicks belong to the
+// artifact; the in-artifact hover FAB covers ad-hoc element annotation.
+let annotation = false;
 let ended = false;
 let agentPresence = "waiting";
 let pendingSnapshot = "";

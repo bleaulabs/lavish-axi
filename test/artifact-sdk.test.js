@@ -324,3 +324,23 @@ test("isModeToggleHotkeyEvent ignores other keys even with a modifier held", () 
   assert.equal(isModeToggleHotkeyEvent({ key: "e", metaKey: true }), false);
   assert.equal(isModeToggleHotkeyEvent({ key: "Enter", metaKey: true }), false);
 });
+
+// ---- Bleau Labs fork contract -----------------------------------------------
+// The fork's core delta: annotate-on-click is OFF by default (clicks belong to
+// the artifact), and annotation is reached via the hover FAB or the armed
+// Annotate switch. These source-level guards keep an upstream merge from
+// silently reverting the fork's interaction model.
+test("fork: artifact SDK defaults annotation mode off and ships the hover FAB", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(new URL("../src/artifact-sdk.js", import.meta.url), "utf8");
+  assert.match(source, /let annotationMode = false;/);
+  assert.match(source, /lavish-hover-fab/);
+  assert.match(source, /function showFabFor\(/);
+  assert.doesNotMatch(source, /let annotationMode = true;/);
+});
+
+test("fork: chrome client starts with the Annotate switch off", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const source = await readFile(new URL("../src/chrome-client.js", import.meta.url), "utf8");
+  assert.match(source, /let annotation = false;/);
+});

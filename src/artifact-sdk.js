@@ -252,7 +252,11 @@ export function createArtifactSdk(
   mermaid = mermaidHelpers,
 ) {
   const { isMermaidSvg, mermaidNodeFrom, mermaidNodeElement } = mermaid;
-  let annotationMode = true;
+  // Bleau Labs fork: annotate-on-click is OFF by default so clicks belong to
+  // the artifact's own interactions (detail popovers, disclosure, etc.).
+  // Annotation is reached through the hover ✎ FAB (see ensureFab) or by
+  // arming full annotate mode with the chrome's Annotate switch.
+  let annotationMode = false;
   let hovered = null;
   let selected = null;
   let ignoreNextClick = false;
@@ -661,6 +665,73 @@ export function createArtifactSdk(
     }
   }
 
+  // Bleau Labs fork: hover-FAB annotation entry. With annotate-on-click off,
+  // hovering an annotatable element floats a small pencil FAB at its top-right
+  // corner; clicking the FAB opens the same annotation card that armed
+  // annotate mode's click-to-annotate opens. The FAB lives in the shadow root
+  // (data-lavish-ui host), so it never collides with artifact styles.
+  let fab = null;
+  let fabTarget = null;
+  let fabHideTimer = 0;
+
+  function ensureFab() {
+    if (fab) return fab;
+    const root = ensureShadow();
+    fab = document.createElement("button");
+    fab.className = "lavish-hover-fab";
+    fab.type = "button";
+    fab.title = "Annotate this element";
+    fab.textContent = "\u270e";
+    fab.addEventListener("mouseenter", () => {
+      if (fabHideTimer) {
+        clearTimeout(fabHideTimer);
+        fabHideTimer = 0;
+      }
+    });
+    fab.addEventListener("mouseleave", scheduleFabHide);
+    fab.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const target = fabTarget;
+      hideFab();
+      if (target) showAnnotationCard(target);
+    });
+    root.appendChild(fab);
+    return fab;
+  }
+
+  function showFabFor(target) {
+    if (!target || target === document.body || target === document.documentElement) {
+      scheduleFabHide();
+      return;
+    }
+    const rect = target.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const el = ensureFab();
+    fabTarget = target;
+    if (fabHideTimer) {
+      clearTimeout(fabHideTimer);
+      fabHideTimer = 0;
+    }
+    el.style.left = Math.max(4, Math.min(rect.right - 11, window.innerWidth - 26)) + "px";
+    el.style.top = Math.max(4, rect.top - 11) + "px";
+    el.style.display = "flex";
+  }
+
+  function scheduleFabHide() {
+    if (fabHideTimer) clearTimeout(fabHideTimer);
+    fabHideTimer = window.setTimeout(hideFab, 350);
+  }
+
+  function hideFab() {
+    if (fabHideTimer) {
+      clearTimeout(fabHideTimer);
+      fabHideTimer = 0;
+    }
+    if (fab) fab.style.display = "none";
+    fabTarget = null;
+  }
+
   function setAnnotationMode(enabled) {
     annotationMode = !!enabled;
     let style = document.getElementById("lavish-cursor-style");
@@ -673,6 +744,7 @@ export function createArtifactSdk(
     }
     if (!annotationMode && style) style.remove();
     if (!annotationMode) closeCard();
+    if (annotationMode) hideFab();
 
     // Freeze Mermaid pan/zoom while annotating so nodes sit at stable screen
     // positions and a click resolves cleanly to one node instead of panning.
@@ -1446,7 +1518,7 @@ export function createArtifactSdk(
 
     shadow = host.attachShadow({ mode: "open" });
     const style = document.createElement("style");
-    style.textContent = `:host{all:initial;position:fixed;z-index:2147483647;left:0;top:0;color-scheme:dark;--ink-900:#0f1115;--ink-800:#11141a;--ink-700:#171a21;--ink-600:#1c212b;--steel-700:#2a2f3a;--steel-600:#303745;--steel-500:#3c4557;--steel-400:#8c96aa;--steel-300:#aeb6c6;--steel-200:#b9c0cf;--steel-100:#d8deea;--cream-50:#fffbf3;--cream-100:#f7f3ea;--cream-200:#e8e1cf;--brass-500:#f4c95d;--brass-400:#ffd877;--brass-ink:#17130a;--bg:var(--ink-900);--bg-panel:var(--ink-800);--bg-elevated:var(--ink-600);--fg:var(--cream-100);--fg-faint:var(--steel-300);--border:var(--steel-600);--accent:#f4c95d;--accent-hover:#ffd877;--font-sans:Geist,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--radius-md:10px;--radius-xl:14px;--shadow-floating:0 20px 70px rgba(0,0,0,.35);font-family:var(--font-sans)}*{box-sizing:border-box}:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.lavish-text-highlight{position:fixed;pointer-events:none;background:rgba(244,201,93,.28);border-radius:2px;box-shadow:0 0 0 1px rgba(244,201,93,.45)}.lavish-annotation-card{position:fixed;width:min(320px,calc(100vw - 24px));padding:12px;border-radius:var(--radius-xl);background:var(--bg-panel);color:var(--fg);border:1px solid var(--accent);box-shadow:var(--shadow-floating);font:14px/1.4 var(--font-sans)}.lavish-heading{font-weight:700;margin-bottom:6px}.lavish-annotation-card textarea{width:100%;min-height:86px;resize:vertical;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg);color:var(--fg);padding:9px;font:inherit;font-family:var(--font-sans)}.lavish-annotation-card textarea::placeholder{color:var(--fg-faint)}.lavish-annotation-card .lavish-hint{margin-top:6px;font-size:11px;color:var(--fg-faint)}.lavish-annotation-card .lavish-row{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}.lavish-annotation-card button{border:0;border-radius:var(--radius-md);padding:8px 10px;font-family:var(--font-sans);font-size:13px;font-weight:700;cursor:pointer}.lavish-annotation-card button:active{opacity:.85}.lavish-annotation-card .lavish-send{background:var(--accent);color:var(--brass-ink)}.lavish-annotation-card .lavish-send:hover{background:var(--accent-hover)}.lavish-annotation-card .lavish-cancel{background:var(--steel-700);color:var(--fg)}`;
+    style.textContent = `:host{all:initial;position:fixed;z-index:2147483647;left:0;top:0;color-scheme:dark;--ink-900:#0f1115;--ink-800:#11141a;--ink-700:#171a21;--ink-600:#1c212b;--steel-700:#2a2f3a;--steel-600:#303745;--steel-500:#3c4557;--steel-400:#8c96aa;--steel-300:#aeb6c6;--steel-200:#b9c0cf;--steel-100:#d8deea;--cream-50:#fffbf3;--cream-100:#f7f3ea;--cream-200:#e8e1cf;--brass-500:#f4c95d;--brass-400:#ffd877;--brass-ink:#17130a;--bg:var(--ink-900);--bg-panel:var(--ink-800);--bg-elevated:var(--ink-600);--fg:var(--cream-100);--fg-faint:var(--steel-300);--border:var(--steel-600);--accent:#f4c95d;--accent-hover:#ffd877;--font-sans:Geist,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--radius-md:10px;--radius-xl:14px;--shadow-floating:0 20px 70px rgba(0,0,0,.35);font-family:var(--font-sans)}*{box-sizing:border-box}:focus-visible{outline:2px solid var(--accent);outline-offset:2px}.lavish-text-highlight{position:fixed;pointer-events:none;background:rgba(244,201,93,.28);border-radius:2px;box-shadow:0 0 0 1px rgba(244,201,93,.45)}.lavish-annotation-card{position:fixed;width:min(320px,calc(100vw - 24px));padding:12px;border-radius:var(--radius-xl);background:var(--bg-panel);color:var(--fg);border:1px solid var(--accent);box-shadow:var(--shadow-floating);font:14px/1.4 var(--font-sans)}.lavish-heading{font-weight:700;margin-bottom:6px}.lavish-annotation-card textarea{width:100%;min-height:86px;resize:vertical;border-radius:var(--radius-md);border:1px solid var(--border);background:var(--bg);color:var(--fg);padding:9px;font:inherit;font-family:var(--font-sans)}.lavish-annotation-card textarea::placeholder{color:var(--fg-faint)}.lavish-annotation-card .lavish-hint{margin-top:6px;font-size:11px;color:var(--fg-faint)}.lavish-annotation-card .lavish-row{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}.lavish-annotation-card button{border:0;border-radius:var(--radius-md);padding:8px 10px;font-family:var(--font-sans);font-size:13px;font-weight:700;cursor:pointer}.lavish-annotation-card button:active{opacity:.85}.lavish-annotation-card .lavish-send{background:var(--accent);color:var(--brass-ink)}.lavish-annotation-card .lavish-send:hover{background:var(--accent-hover)}.lavish-annotation-card .lavish-cancel{background:var(--steel-700);color:var(--fg)}.lavish-hover-fab{position:fixed;display:none;align-items:center;justify-content:center;width:22px;height:22px;padding:0;border-radius:7px;border:1px solid var(--steel-500);background:var(--bg-panel);color:var(--accent);font:13px/1 var(--font-sans);cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.35);z-index:2}.lavish-hover-fab:hover{border-color:var(--accent);background:var(--bg-elevated)}`;
     shadow.appendChild(style);
     return shadow;
   }
@@ -1564,6 +1636,10 @@ export function createArtifactSdk(
     true,
   );
 
+  // The FAB is viewport-anchored; scrolling would leave it floating over the
+  // wrong element, so just hide it and let the next hover re-place it.
+  document.addEventListener("scroll", () => hideFab(), { capture: true, passive: true });
+
   // Report scroll position to the chrome so it can be restored across hot reloads.
   // The iframe is sandboxed without same-origin, so the chrome can't read scrollY directly.
   let scrollFrame = 0;
@@ -1582,14 +1658,17 @@ export function createArtifactSdk(
   document.addEventListener(
     "mouseover",
     (event) => {
-      if (
-        !annotationMode ||
-        isLavishUi(event.target) ||
-        isLavishAction(event.target) ||
-        isInteractiveControl(event.target)
-      )
+      if (isLavishUi(event.target) || isLavishAction(event.target) || isInteractiveControl(event.target)) {
+        if (!annotationMode) scheduleFabHide();
         return;
+      }
       const target = annotationTargetEl(event.target);
+      if (!annotationMode) {
+        // Bleau Labs fork: unarmed mode offers annotation via the hover FAB
+        // instead of stealing hover/click from the artifact.
+        showFabFor(target);
+        return;
+      }
       if (target === selected) return;
       if (hovered && hovered !== selected) clearHighlight(hovered);
       hovered = target;
@@ -1612,13 +1691,9 @@ export function createArtifactSdk(
   document.addEventListener(
     "mouseup",
     (event) => {
-      if (
-        !annotationMode ||
-        isLavishUi(event.target) ||
-        isLavishAction(event.target) ||
-        isInteractiveControl(event.target)
-      )
-        return;
+      // Bleau Labs fork: selecting text is a deliberate gesture, so the
+      // text-selection annotation card opens in unarmed mode too.
+      if (isLavishUi(event.target) || isLavishAction(event.target) || isInteractiveControl(event.target)) return;
 
       const c = textSelectionContext(document.getSelection());
       if (!c) return;

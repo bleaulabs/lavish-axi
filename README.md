@@ -28,6 +28,20 @@
 
 HTML is the new markdown. Lavish is the new editor for your HTML artifacts.
 
+> **Bleau Labs fork** (`bleaulabs/lavish-axi`, tracking upstream `kunchenguid/lavish-axi@0.1.42`).
+> Interaction-model delta, and the only intended divergence:
+>
+> - **Annotate-on-click is OFF by default.** Clicks belong to the artifact's own
+>   interactions (detail popovers, disclosure, forms). The chrome's Annotate
+>   switch still arms the upstream highlight/click-to-annotate mode.
+> - **Hover ✎ FAB.** In the default (unarmed) mode, hovering an annotatable
+>   element floats a small pencil FAB at its top-right corner; clicking it opens
+>   the same annotation card. Text-selection annotation works in both modes.
+>
+> Rationale: decide-and-show review artifacts (agent decides, human drills in
+> and flinches) need the click for progressive disclosure, with annotation as an
+> explicit affordance. Invoke via `npx -y github:bleaulabs/lavish-axi`.
+
 Agents are good at producing rich HTML artifacts, but the human-agent collaboration loop on such artifacts is lacking and falls back into screenshots and long responses for “tell me what to change.”
 That loses the thing HTML is best at: interactivity.
 

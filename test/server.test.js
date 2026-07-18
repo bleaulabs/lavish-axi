@@ -327,7 +327,7 @@ test("annotation card shadow styles use Lavish design-system variables", () => {
 test("chrome top bar uses an Annotate switch instead of a labeled toggle button", () => {
   const html = createChromeHtml({ key: "abc", file: "/tmp/artifact.html" });
 
-  assert.match(html, /class="annotate-switch" id="annotation"[^>]*aria-pressed="true"/);
+  assert.match(html, /class="annotate-switch" id="annotation"[^>]*aria-pressed="false"/);
   assert.match(html, /class="switch-track"/);
   assert.match(html, />Annotate</);
   assert.doesNotMatch(html, /Annotation: On/);
